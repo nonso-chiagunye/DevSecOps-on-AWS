@@ -174,7 +174,7 @@ phases:
       - echo "Deployment completed..........."
       - sleep 50
 
-        # Perform Dynamic Application Security Test with OWASP ZAP 
+        # PERFORM DAST WITH OWASP ZAP
       - echo "Running DAST with OWASP ZAP........."
       - docker pull softwaresecurityproject/zap-stable
       - chmod a+w $(pwd)
