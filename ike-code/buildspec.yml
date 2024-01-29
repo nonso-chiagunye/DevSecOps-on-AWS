@@ -1,0 +1,200 @@
+version: 0.2
+
+env:
+  secrets-manager:
+    # IMPORT SECRETS FROM SECRETS MANAGER  
+    SONAR_TOKEN: "ike-fitness-secrets:SONAR_TOKEN"
+    SNYK_TOKEN: "ike-fitness-secrets:SNYK_TOKEN"
+    SONAR_PROJECT_KEY: "ike-fitness-secrets:SONAR_PROJECT_KEY"
+    SONAR_ORGANIZATION_KEY: "ike-fitness-secrets:SONAR_ORGANIZATION_KEY"
+    AWS_DEFAULT_REGION: "ike-fitness-secrets:AWS_DEFAULT_REGION"
+    ECR_REPO_URI: "ike-fitness-secrets:ECR_REPO_URI"
+    DOCKER_SERVER: "ike-fitness-secrets:DOCKER_SERVER"
+    DOCKER_USERNAME: "ike-fitness-secrets:DOCKER_USERNAME"
+    DOCKER_PASSWORD: "ike-fitness-secrets:DOCKER_PASSWORD"
+    DOCKER_EMAIL: "ike-fitness-secrets:DOCKER_EMAIL"
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: latest
+    commands:
+      # INSTALL TOOLS AND DEPENDENCIES
+      - apt-get -y update 
+      - sleep 10
+      - npm install
+      - npm install -g aws-cli
+      - npm install -g sonarqube-scanner
+      - npm install -g snyk
+      - npm install -g snyk-to-html 
+      - curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.18.9/2020-11-02/bin/linux/amd64/kubectl
+      - chmod +x ./kubectl
+      - mv ./kubectl /usr/local/bin/kubectl
+      - apt-get install -y jq
+      - sleep 10
+      - if ! command -v bc &> /dev/null; 
+        then 
+          apt-get install -y bc; 
+        fi 
+
+  pre_build:
+    commands:
+      # PERFORM QUALITY TEST WITH SONARCLOUD 
+      - sleep 10
+      - echo "Runnning quality test with SonarCloud......."
+      - sonar-scanner -Dsonar.login=$SONAR_TOKEN -Dsonar.host.url=https://sonarcloud.io -Dsonar.projectKey=$SONAR_PROJECT_KEY -Dsonar.organization=$SONAR_ORGANIZATION_KEY
+
+        # Import the result and check for project status
+      - SONAR_RESULT=$(curl -s https://sonarcloud.io/api/qualitygates/project_status?projectKey=$SONAR_PROJECT_KEY)
+      - echo $SONAR_RESULT > sonar_result.json
+      - SONAR_PROJECT_STATUS=$(echo $SONAR_RESULT | jq -r '.projectStatus.status')
+
+        # Fail the pipeline if code fails the set quality gates
+      - if [ "$SONAR_PROJECT_STATUS" = "ERROR" ]; 
+        then 
+          echo "SonarCloud Quality Gate check failed. Exiting with an error."; 
+          exit 1; 
+        else 
+          echo "SonarCloud Quality Gate check passed."; 
+        fi
+      - sleep 10
+
+      # PERFORM BOTH SCA AND SAST WITH SNYK 
+      - echo "Running SAST and SCA test with Snyk........."
+      - SNYK_TOKEN=$SNYK_TOKEN
+
+        # Run Open Source "Software Composition Analysis with snyk test"
+      - echo "Running Snyk Open Source (SCA) Scan......"
+      - snyk test --all-projects --json-file-output=snyk_open_source.json || true # Prevent snyk from exiting if issues are discovered. Handle the decision yourself..
+      - snyk-to-html -i snyk_open_source.json -o snyk_open_source.html # Get a html artifact of the result
+      - SNYK_OPEN_SOURCE_SEVERITY=$(jq -r '.vulnerabilities[0].severity' snyk_open_source.json)
+      - SNYK_OPEN_SOURCE_cvssScore=$(jq -r '.vulnerabilities[0].cvssScore' snyk_open_source.json)
+
+         # Fail build only on cvss 7 and above
+      - if [ "$(echo "$SNYK_OPEN_SOURCE_cvssScore >= 7" | bc)" -eq 1 ]; 
+        then 
+          echo "cvssScore is greater than 7. Exiting with an error.";
+          exit 1; 
+        fi
+
+         # Continue build with a warning if severity is medium
+      - if [ "$SNYK_OPEN_SOURCE_SEVERITY" = "medium" ]; 
+        then 
+          echo "There are many vulnerabilities, but continuing. Pay attention to snyk_open_source.html for details";
+        fi
+      - sleep 10  
+
+        # Run Static Application Security Test with snyk code test 
+      - echo "Running Code Scan (SAST)......." 
+      - snyk code test --all-projects --json-file-output=snyk_code_test.json --fail-on=patchable || true # Prevent snyk from exiting if issues are discovered. Handle the decision yourself..
+      - snyk-to-html -i snyk_code_test.json -o snyk_code_test.html # Get a html artifact of the result
+
+        # Fail if there are patchable errors on the code itself
+      - if jq '.runs[].tool.driver.rules[] | select(.defaultConfiguration.level == "error")' snyk_code_test.json; 
+        then
+          echo "Patchable errors found in code. Exiting with an error."; 
+          exit 1; 
+        else 
+          echo "No significant errors found. Continuing with the build."; 
+        fi
+      - sleep 10 
+
+
+  build:
+    commands:
+      # BUILD CODE, DOCKERIZE IT, AND PUSH DOCKER IMAGE TO AWS ECR REPOSITORY 
+        # Build app 
+      - echo "Building the NodeJS App......."
+      - npm run build:js
+      - sleep 5
+
+        # Create a docker image 
+      - echo "Creating a docker image..........."
+      - echo "Logging in to Amazon ECR..."
+      - aws --version
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPO_URI
+      - echo "Building Docker image..."
+      - docker build -t $ECR_REPO_URI .
+      - sleep 5
+
+        # Push image to ECR repository
+      - echo "Pushing Docker image to ECR..."
+      - docker push $ECR_REPO_URI
+      - sleep 10
+
+  post_build:
+    commands:
+      # DEPLOY TO EKS AND RUN DYNAMIC APPLICATION SECURITY TEST (DAST)
+        # Deploy to EKS 
+      - echo "Deploying Docker image to EKS......." 
+      - aws eks update-kubeconfig --region $AWS_DEFAULT_REGION --name ike-eks-cluster
+      - cat ~/.kube/config
+      - sleep 5
+
+        # Check if ikefitness namespace already exists, and create it if it doesn't
+      - echo "Checking namespace....."
+      - NAMESPACE=$(kubectl get namespace | grep ikefitness || true) # In the first build, this will return false so it needs to be protected from failing. 
+      - if [ -z "$NAMESPACE" ]; 
+        then 
+          echo "Creating ikefitness namespace"
+          kubectl create namespace ikefitness; 
+        else
+          echo "ikefitness namespace already exists";
+        fi
+      - sleep 5
+
+        # Check if regcred secret already exists and create it if it doesn't
+      - echo "Checking regcred secret....."
+      - SECRET=$(kubectl get secret -n ikefitness | grep regcred || true) # In the first build, this will return false so it needs to be protected from failing.
+
+         # This secret is required to pull images from private repositories like ECR 
+      - if [ -z "$SECRET" ];
+        then 
+          echo "Creating regcred secret......"
+          kubectl create secret docker-registry regcred -n ikefitness --docker-server=$DOCKER_SERVER --docker-username=$DOCKER_USERNAME --docker-password=$DOCKER_PASSWORD --docker-email=$DOCKER_EMAIL; 
+        else 
+          echo "regcred secret already exists";
+        fi
+      - sleep 5
+
+        # Deploy to Kubernetes cluster
+      - echo "Deploying application to EKS......"
+      - kubectl apply -f deployment.yaml -n ikefitness
+      - sleep 40
+
+        # Check if load balancer already exists and create it if it doesn't
+      - LOADBALANCER=$(kubectl get service ikefitness-service -n ikefitness --output='json' --ignore-not-found | awk -F'"' '/hostname/{print $4}') # In the first build, this will return false so it needs to be protected from failing.
+      - if [ -z "$LOADBALANCER" ]; 
+        then 
+          echo "Creating load balancer......"
+          kubectl apply -f service.yaml -n ikefitness; 
+        else
+          echo "Load balancer $LOADBALANCER already exists";
+        fi
+      - echo "Deployment completed..........."
+      - sleep 50
+
+        # Perform Dynamic Application Security Test with OWASP ZAP 
+      - echo "Running DAST with OWASP ZAP........."
+      - docker pull softwaresecurityproject/zap-stable
+      - chmod a+w $(pwd)
+
+        # At this stage of the pipeline, the code has alrady been deployed, so there is no point failing build if DAST finds vulnerabilities. So the scans a protected, so the results can be collected for all scans
+        # This test performs baseline scan and api scan on all the api endpoints in Ike Fitness App. 
+
+      - docker run -v $(pwd):/zap/wrk/:rw -t softwaresecurityproject/zap-stable zap-baseline.py -t http://$LOADBALANCER -g gen.conf -r baseline_scan.html || true
+      - sleep 20 
+      - docker run -v $(pwd):/zap/wrk/:rw -t softwaresecurityproject/zap-stable zap-api-scan.py -t http://$LOADBALANCER/api/v1/plans -f openapi -g gen.conf -r plans_endpoint.html || true 
+      - sleep 20
+      - docker run -v $(pwd):/zap/wrk/:rw -t softwaresecurityproject/zap-stable zap-api-scan.py -t http://$LOADBALANCER/api/v1/users -f openapi -g gen.conf -r users_endpoint.html || true 
+      - sleep 20
+      - docker run -v $(pwd):/zap/wrk/:rw -t softwaresecurityproject/zap-stable zap-api-scan.py -t http://$LOADBALANCER/api/v1/reviews -f openapi -g gen.conf -r reviews_endpoint.html || true 
+      - sleep 20 
+      - docker run -v $(pwd):/zap/wrk/:rw -t softwaresecurityproject/zap-stable zap-api-scan.py -t http://$LOADBALANCER/api/v1/bookings -f openapi -g gen.conf -r bookings_endpoint.html || true 
+      - sleep 20 
+ 
+artifacts:
+  files: "**/*"
+  name: ike-$CODEBUILD_BUILD_NUMBER-$(date "+%Y-%m-%d %H:%M")
+  discard-paths: yes
+  s3-prefix: "codebuild/"

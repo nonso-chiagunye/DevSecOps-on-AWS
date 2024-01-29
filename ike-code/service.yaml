@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ikefitness-service
+spec:
+  selector:
+    app: ikefitness
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000 
+  type: LoadBalancer

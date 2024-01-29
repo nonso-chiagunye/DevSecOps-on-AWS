@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ikefitness-deployment
+spec:
+  replicas: 3 
+  selector:
+    matchLabels:
+      app: ikefitness
+  template:
+    metadata:
+      labels:
+        app: ikefitness
+    spec:
+      containers:
+        - name: ikefitness
+          image: <account_id>.dkr.ecr.<region>.amazonaws.com/<repo_name>:latest 
+          ports:
+            - containerPort: 3000 
+      imagePullSecrets:
+        - name: regcred 
