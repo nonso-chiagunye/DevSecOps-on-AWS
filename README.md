@@ -22,4 +22,12 @@
 - If a vulnerability with CVSS Score >= 7 is discovered, pipeline exit
 - Code is tested for vulnerability (SAST) with Snyk.
 - If a vulnerability at level 'error' is discovered, pipeline exit
--
+- Code is built with _npm build_
+- Code is dockerized using the included _Dockerfile_
+- Docker image is pushed to ECR repository
+- Image is pulled from ECR repository and deployed on EKS Cluster
+- Load Balancer IP is extrated from the cluster using _kubectl_
+- Using the load balancer, DAST testing is performed with [OWASP ZAP](https://www.zaproxy.org/)
+- Artifact is collated and sent back to AWS CodePipeline
+- AWS CodePipeline sends the Artifact to S3 Bucket
+- Exit 0
