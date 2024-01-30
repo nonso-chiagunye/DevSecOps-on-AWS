@@ -1,4 +1,3 @@
-
 resource "aws_eks_addon" "ike_csi_driver" {
   cluster_name             = aws_eks_cluster.ike_eks_cluster.name
   addon_name               = "aws-ebs-csi-driver"

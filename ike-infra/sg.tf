@@ -1,4 +1,3 @@
-
 resource "aws_security_group" "ike_alb_sg" {
   vpc_id      = aws_vpc.ike_vpc.id
   name        = var.lb_security_group

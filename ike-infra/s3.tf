@@ -1,5 +1,3 @@
-
-
 resource "aws_s3_bucket" "ike_artifact_bucket" {
   bucket = var.bucket_name
 }
@@ -7,17 +5,11 @@ resource "aws_s3_bucket" "ike_artifact_bucket" {
 resource "aws_s3_bucket_ownership_controls" "ike_artifact_ownership_control" {
   bucket = aws_s3_bucket.ike_artifact_bucket.id
   rule {
-    # object_ownership = "BucketOwnerPreferred"
+ 
     object_ownership = "ObjectWriter"
   }
 }
 
-# resource "aws_s3_bucket_acl" "ike_artifact_acl" {
-#   depends_on = [aws_s3_bucket_ownership_controls.ike_artifact_ownership_control]
-
-#   bucket = aws_s3_bucket.ike_artifact_bucket.id
-#   acl    = "private"
-# }
 
 resource "aws_s3_bucket_versioning" "ike_artifact_versioning" {
   bucket = aws_s3_bucket.ike_artifact_bucket.id
