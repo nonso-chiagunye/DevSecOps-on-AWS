@@ -44,3 +44,37 @@
 - Manages the pipeline
 - Checks out code from AWS CodeCommit repository, sends it to CodeBuild, and receives the artifact from CodeBuild to store in S3
 - Must have write permission on specified bucket, and kms decrypt permission
+
+✅ AWS Secrets Manager
+
+- Stores the secrets variables used by both the Infrastructure (like CodeBuild), the pipeline, and the NodeJS application
+
+✅ AWS CodeBuild
+
+- Uses node:20 runtime running on Ubuntu 22.04
+- Must have decrypt permission on kms
+- Must have necessary permissions on specified secret manager secret, S3 bucket, ECR repo, EKS cluster and nodes
+- Deployed with environment variable configurations having tokens to access SonarCloud and Snyk
+
+✅ AWS ECR Repositary
+
+- Container repository for docker images
+
+✅ AWS EKS Cluster
+
+- The Kubernetes control plain used to deploy the application
+- Configured to deploy the app on 2 loadbalanced nodes running on private subnets in 2 availability zones
+- The CodeBuild IAM role must be added to the [aws-auth configMap](https://docs.aws.amazon.com/eks/latest/userguide/add-user-role.html), with group - system:masters
+
+✅ AWS S3 Bucket
+
+- Used to hold the artifacts
+
+✅ AWS IAM
+
+- Manages the roles and their permissions
+
+## The NodeJS Application ([Ike Fitness](https://ike-fitness.onrender.com))
+
+- The application is reconfigured to read secret envs from AWS Secret Manager
+- To set it up, the AWS Region hosting the secrets needs to be specified at the enty point of the app ([server.js](ike-code/server.js))

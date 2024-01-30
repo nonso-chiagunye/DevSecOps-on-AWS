@@ -93,3 +93,13 @@ variable "vpc" {
   type = string
   default = ""  
 }
+
+variable "instance_type" {
+  type = list(string)
+  default = [ "" ]  
+}
+
+variable "disk_size" {
+  type = number
+  default = 0   
+}

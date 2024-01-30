@@ -20,8 +20,8 @@ resource "aws_eks_node_group" "ike_nodes" {
   cluster_name    = aws_eks_cluster.ike_eks_cluster.name
   node_group_name = var.eks_node
   node_role_arn   = aws_iam_role.ike_eks_node_role.arn
-  instance_types = ["c5.large"]
-  disk_size = "300"
+  instance_types = var.instance_type
+  disk_size = var.disk_size
   subnet_ids      = [aws_subnet.ike_private_subnet01.id, aws_subnet.ike_private_subnet02.id]
 
   scaling_config {
