@@ -34,43 +34,43 @@
 
 ## Infrastructure Configuration
 
-📍 AWS CodeCommit
+📍 **AWS CodeCommit**
 
 - The Code repository
 - If you connect to AWS with Single-Sign-On, you need to install [git-remote-codecommit](https://docs.aws.amazon.com/codecommit/latest/userguide/setting-up-git-remote-codecommit.html) to clone and push to CodeCommit repository
 
-📍 AWS CodePipeline
+📍 **AWS CodePipeline**
 
 - Manages the pipeline
 - Checks out code from AWS CodeCommit repository, sends it to CodeBuild, and receives the artifact from CodeBuild to store in S3
 - Must have write permission on specified bucket, and kms decrypt permission
 
-📍 AWS Secrets Manager
+📍 **AWS Secrets Manager**
 
 - Stores the secrets variables used by both the Infrastructure (like CodeBuild), the pipeline, and the NodeJS application
 
-📍 AWS CodeBuild
+📍 **AWS CodeBuild**
 
 - Uses node:20 runtime running on Ubuntu 22.04
 - Must have decrypt permission on kms
 - Must have necessary permissions on specified secret manager secret, S3 bucket, ECR repo, EKS cluster and nodes
 - Deployed with environment variable configurations having tokens to access SonarCloud and Snyk
 
-📍 AWS ECR Repositary
+📍 **AWS ECR Repositary**
 
 - Container repository for docker images
 
-📍 AWS EKS Cluster
+📍 **AWS EKS Cluster**
 
 - The Kubernetes control plain used to deploy the application
 - Configured to deploy the app on 2 loadbalanced nodes running on private subnets in 2 availability zones
 - The CodeBuild IAM role must be added to the [aws-auth configMap](https://docs.aws.amazon.com/eks/latest/userguide/add-user-role.html), with group - system:masters
 
-📍 AWS S3 Bucket
+📍 **AWS S3 Bucket**
 
 - Used to hold the artifacts
 
-📍 AWS IAM
+📍 **AWS IAM**
 
 - Manages the roles and their permissions
 
