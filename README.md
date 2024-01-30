@@ -77,4 +77,4 @@
 ## The NodeJS Application ([Ike Fitness](https://ike-fitness.onrender.com))
 
 - The application is reconfigured to read secret envs from AWS Secret Manager
-- To set it up, the AWS Region hosting the secrets needs to be specified at the enty point of the app ([server.js](ike-code/server.js))
+- To set it up, the AWS Region hosting the secrets needs to be specified at the entry point of the app ([server.js](ike-code/server.js))
