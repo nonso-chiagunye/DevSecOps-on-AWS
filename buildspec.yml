@@ -65,7 +65,8 @@ phases:
 
         # Run Open Source "Software Composition Analysis with snyk test"
       - echo "Running Snyk Open Source (SCA) Scan......"
-      - snyk test --all-projects --json-file-output=snyk_open_source.json || true # Prevent snyk from exiting if issues are discovered. Handle the decision yourself..
+        # Prevent snyk from exiting if issues are discovered. Handle the decision yourself..
+      - snyk test --all-projects --json-file-output=snyk_open_source.json || true
       - snyk-to-html -i snyk_open_source.json -o snyk_open_source.html # Get a html artifact of the result
       - SNYK_OPEN_SOURCE_SEVERITY=$(jq -r '.vulnerabilities[0].severity' snyk_open_source.json)
       - SNYK_OPEN_SOURCE_cvssScore=$(jq -r '.vulnerabilities[0].cvssScore' snyk_open_source.json)
@@ -86,7 +87,8 @@ phases:
 
         # Run Static Application Security Test with snyk code test
       - echo "Running Code Scan (SAST)......."
-      - snyk code test --all-projects --json-file-output=snyk_code_test.json --fail-on=patchable || true # Prevent snyk from exiting if issues are discovered. Handle the decision yourself..
+        # Prevent snyk from exiting if issues are discovered. Handle the decision yourself..
+      - snyk code test --all-projects --json-file-output=snyk_code_test.json --fail-on=patchable || true
       - snyk-to-html -i snyk_code_test.json -o snyk_code_test.html # Get a html artifact of the result
 
 
@@ -133,7 +135,8 @@ phases:
 
         # Check if ikefitness namespace already exists, and create it if it doesn't
       - echo "Checking namespace....."
-      - NAMESPACE=$(kubectl get namespace | grep ikefitness || true) # In the first build, this will return false so it needs to be protected from failing.
+        # In the first build, this will return false so it needs to be protected from failing.
+      - NAMESPACE=$(kubectl get namespace | grep ikefitness || true)
       - if [ -z "$NAMESPACE" ];
         then
         echo "Creating ikefitness namespace"
@@ -145,8 +148,8 @@ phases:
 
         # Check if regcred secret already exists and create it if it doesn't
       - echo "Checking regcred secret....."
-      - SECRET=$(kubectl get secret -n ikefitness | grep regcred || true) # In the first build, this will return false so it needs to be protected from failing.
-
+        # In the first build, this will return false so it needs to be protected from failing.
+      - SECRET=$(kubectl get secret -n ikefitness | grep regcred || true)
 
         # This secret is required to pull images from private repositories like ECR
       - if [ -z "$SECRET" ];

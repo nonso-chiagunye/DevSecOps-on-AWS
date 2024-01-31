@@ -5,7 +5,7 @@
 ---
 
 <div align="center" style="display: flex; flex-direction: column; justify-content: center; align-items: center;">
-  <img src="ike-aws-architecture.gif" alt="Ike Fitness" width="800"/>
+  <img src="DevSecOps-AWS.gif" alt="Ike Fitness" width="800"/>
 </div>
 
 ---
@@ -53,7 +53,7 @@
 
 - Uses node:20 runtime running on Ubuntu 22.04
 - Must have decrypt permission on kms
-- Must have necessary permissions on specified secret manager secret, S3 bucket, ECR repo, EKS cluster and nodes
+- Must have necessary permissions on specified secret manager secret, S3 bucket, ECR repo, EKS cluster and nodes. See my [IAM](ike-infra/iam.tf)
 - Deployed with environment variable configurations having tokens to access SonarCloud and Snyk
 
 ➡️ **AWS ECR Repositary**
